@@ -117,24 +117,21 @@ $stmt->close();
 // Hash password
 $hashedPassword = hashPassword($password);
 
-// Create uploads directory if it doesn't exist
-$uploadDir = '../uploads/matric_cards/';
-if (!file_exists($uploadDir)) {
-    mkdir($uploadDir, 0777, true);
+// Include Cloudinary helper
+require_once __DIR__ . '/cloudinary_helper.php';
+
+// Upload matric card to Cloudinary
+$uploadResult = uploadImageToCloudinary($file['tmp_name'], 'matric_cards', [
+    'public_id' => $matricUpper . '_' . time(), // Custom public ID
+    'folder' => 'matric_cards',
+]);
+
+if (!$uploadResult['success']) {
+    sendJSONResponse(['success' => false, 'message' => 'Failed to upload file to Cloudinary: ' . ($uploadResult['error'] ?? 'Unknown error')], 500);
 }
 
-// Generate unique filename
-$fileExtension = pathinfo($file['name'], PATHINFO_EXTENSION);
-$fileName = $matricUpper . '_' . time() . '.' . $fileExtension;
-$filePath = $uploadDir . $fileName;
-
-// Move uploaded file
-if (!move_uploaded_file($file['tmp_name'], $filePath)) {
-    sendJSONResponse(['success' => false, 'message' => 'Failed to upload file. Please try again.'], 500);
-}
-
-// Store relative path for database (from project root)
-$matricCardPath = 'uploads/matric_cards/' . $fileName;
+// Store Cloudinary URL in database
+$matricCardPath = $uploadResult['url'];
 
 // Insert new user with matric_card path, batch, and is_verified = true (auto-verified)
 $stmt = $conn->prepare("INSERT INTO users (name, matric, email, password, program, matric_card, batch, is_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");

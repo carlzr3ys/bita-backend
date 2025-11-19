@@ -1,6 +1,7 @@
 <?php
 require_once '../config.php';
 require_once '../api/cors.php';
+require_once __DIR__ . '/cloudinary_helper.php';
 // DO NOT require 'check_session.php' - it will return response and exit!
 // We check session manually below
 
@@ -78,27 +79,23 @@ if (!in_array($fileExt, $allowedTypes)) {
     exit;
 }
 
-// Create upload directory structure: uploads/modules/{week_id}/
-$uploadDir = __DIR__ . '/../uploads/modules/' . $weekId . '/';
-if (!is_dir($uploadDir)) {
-    if (!mkdir($uploadDir, 0755, true)) {
-        sendJSONResponse(['success' => false, 'message' => 'Failed to create upload directory']);
-        exit;
-    }
-}
+// Upload file to Cloudinary
+$cloudinaryFolder = 'modules/week_' . $weekId;
+$uniqueFileName = time() . '_' . uniqid() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', pathinfo($fileName, PATHINFO_FILENAME));
 
-// Generate unique filename
-$uniqueFileName = time() . '_' . uniqid() . '_' . preg_replace('/[^a-zA-Z0-9._-]/', '_', $fileName);
-$filePath = $uploadDir . $uniqueFileName;
+// Upload to Cloudinary
+$uploadResult = uploadToCloudinary($fileTmpName, $cloudinaryFolder, [
+    'public_id' => $uniqueFileName,
+    'resource_type' => 'auto', // Auto-detect file type
+]);
 
-// Move uploaded file
-if (!move_uploaded_file($fileTmpName, $filePath)) {
-    sendJSONResponse(['success' => false, 'message' => 'Failed to save file']);
+if (!$uploadResult['success']) {
+    sendJSONResponse(['success' => false, 'message' => 'Failed to upload file to Cloudinary: ' . ($uploadResult['error'] ?? 'Unknown error')]);
     exit;
 }
 
-// Store relative path in database
-$relativePath = 'uploads/modules/' . $weekId . '/' . $uniqueFileName;
+// Store Cloudinary URL in database
+$relativePath = $uploadResult['url'];
 
 // Check if is_pinned column exists (for backwards compatibility)
 $checkColumn = $conn->query("SHOW COLUMNS FROM module_files LIKE 'is_pinned'");
@@ -114,7 +111,10 @@ $hasVisibilityColumn = $checkVisibilityColumn->num_rows > 0;
 if ($hasPinnedColumn && $hasVisibilityColumn) {
     $stmt = $conn->prepare("INSERT INTO module_files (week_id, file_name, file_path, file_size, file_type, uploaded_by, description, visibility, is_pinned) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)");
     if (!$stmt) {
-        @unlink($filePath);
+        // Delete from Cloudinary if database insert fails
+        if (isset($uploadResult['public_id'])) {
+            deleteFromCloudinary($uploadResult['public_id'], 'auto');
+        }
         sendJSONResponse([
             'success' => false, 
             'message' => 'Failed to prepare statement: ' . $conn->error,
@@ -128,7 +128,10 @@ if ($hasPinnedColumn && $hasVisibilityColumn) {
     // Has pinned but not visibility
     $stmt = $conn->prepare("INSERT INTO module_files (week_id, file_name, file_path, file_size, file_type, uploaded_by, description, is_pinned) VALUES (?, ?, ?, ?, ?, ?, ?, 0)");
     if (!$stmt) {
-        @unlink($filePath);
+        // Delete from Cloudinary if database insert fails
+        if (isset($uploadResult['public_id'])) {
+            deleteFromCloudinary($uploadResult['public_id'], 'auto');
+        }
         sendJSONResponse([
             'success' => false, 
             'message' => 'Failed to prepare statement: ' . $conn->error,
@@ -142,7 +145,10 @@ if ($hasPinnedColumn && $hasVisibilityColumn) {
     // Has visibility but not pinned
     $stmt = $conn->prepare("INSERT INTO module_files (week_id, file_name, file_path, file_size, file_type, uploaded_by, description, visibility) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
     if (!$stmt) {
-        @unlink($filePath);
+        // Delete from Cloudinary if database insert fails
+        if (isset($uploadResult['public_id'])) {
+            deleteFromCloudinary($uploadResult['public_id'], 'auto');
+        }
         sendJSONResponse([
             'success' => false, 
             'message' => 'Failed to prepare statement: ' . $conn->error,
@@ -156,7 +162,10 @@ if ($hasPinnedColumn && $hasVisibilityColumn) {
     // Fallback if neither column exists yet
     $stmt = $conn->prepare("INSERT INTO module_files (week_id, file_name, file_path, file_size, file_type, uploaded_by, description) VALUES (?, ?, ?, ?, ?, ?, ?)");
     if (!$stmt) {
-        @unlink($filePath);
+        // Delete from Cloudinary if database insert fails
+        if (isset($uploadResult['public_id'])) {
+            deleteFromCloudinary($uploadResult['public_id'], 'auto');
+        }
         sendJSONResponse([
             'success' => false, 
             'message' => 'Failed to prepare statement: ' . $conn->error,
@@ -173,10 +182,12 @@ if ($hasPinnedColumn && $hasVisibilityColumn) {
 $executeResult = $stmt->execute();
 
 if (!$executeResult) {
-    // Delete uploaded file if database insert fails
+    // Delete from Cloudinary if database insert fails
     $error = $stmt->error;
     $errno = $stmt->errno;
-    @unlink($filePath);
+    if (isset($uploadResult['public_id'])) {
+        deleteFromCloudinary($uploadResult['public_id'], 'auto');
+    }
     $stmt->close();
     $conn->close();
     
@@ -232,8 +243,10 @@ if ($fileId > 0 && $affectedRows > 0) {
             ]
         ]);
     } else {
-        // Record not found after insert
-        @unlink($filePath);
+        // Record not found after insert - delete from Cloudinary
+        if (isset($uploadResult['public_id'])) {
+            deleteFromCloudinary($uploadResult['public_id'], 'auto');
+        }
         $conn->close();
         
         error_log("Upload failed - Insert ID returned but record not found. File ID: " . $fileId);
@@ -246,8 +259,10 @@ if ($fileId > 0 && $affectedRows > 0) {
         ]);
     }
 } else {
-    // Delete uploaded file if insert ID is invalid
-    @unlink($filePath);
+    // Delete from Cloudinary if insert ID is invalid
+    if (isset($uploadResult['public_id'])) {
+        deleteFromCloudinary($uploadResult['public_id'], 'auto');
+    }
     $conn->close();
     
     error_log("Upload failed - Invalid insert ID or affected rows. File ID: " . $fileId . ", Affected: " . $affectedRows);
