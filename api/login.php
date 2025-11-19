@@ -1,4 +1,7 @@
 <?php
+// Start output buffering to prevent headers already sent error
+ob_start();
+
 require_once '../config.php';
 
 header('Content-Type: application/json');
@@ -55,6 +58,9 @@ $_SESSION['user_name'] = $user['name'];
 
 $conn->close();
 
+// Clean output buffer before sending response
+ob_end_clean();
+
 sendJSONResponse([
     'success' => true,
     'message' => 'Login successful',
@@ -66,5 +72,4 @@ sendJSONResponse([
         'program' => $user['program']
     ]
 ]);
-?>
 
