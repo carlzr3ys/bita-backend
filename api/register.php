@@ -1,12 +1,25 @@
 <?php
+// Start output buffering to prevent headers already sent error
+ob_start();
+
 require_once '../config.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: POST');
+header('Access-Control-Allow-Methods: POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Credentials: true');
+header('Access-Control-Max-Age: 86400'); // 24 hours
+
+// Handle CORS preflight OPTIONS request
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    ob_end_clean();
+    exit();
+}
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    ob_end_clean();
     sendJSONResponse(['success' => false, 'message' => 'Invalid request method'], 405);
 }
 
@@ -19,11 +32,13 @@ $program = isset($_POST['program']) ? trim($_POST['program']) : '';
 
 // Validate required fields
 if (empty($name) || empty($matric) || empty($email) || empty($password) || empty($program)) {
+    ob_end_clean();
     sendJSONResponse(['success' => false, 'message' => 'Missing required fields'], 400);
 }
 
 // Validate file upload
 if (!isset($_FILES['matricCard']) || $_FILES['matricCard']['error'] !== UPLOAD_ERR_OK) {
+    ob_end_clean();
     sendJSONResponse(['success' => false, 'message' => 'Please upload a photo of your matric card'], 400);
 }
 
@@ -32,11 +47,13 @@ $file = $_FILES['matricCard'];
 // Validate file type
 $allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
 if (!in_array($file['type'], $allowedTypes)) {
+    ob_end_clean();
     sendJSONResponse(['success' => false, 'message' => 'Invalid file type. Please upload PNG, JPG, or JPEG image'], 400);
 }
 
 // Validate file size (5MB)
 if ($file['size'] > 5 * 1024 * 1024) {
+    ob_end_clean();
     sendJSONResponse(['success' => false, 'message' => 'File size must be less than 5MB'], 400);
 }
 
@@ -45,16 +62,19 @@ $is_verified = false;
 
 // Validate email format
 if (!isValidEmail($email)) {
+    ob_end_clean();
     sendJSONResponse(['success' => false, 'message' => 'Invalid email format. Must be @student.utem.edu.my'], 400);
 }
 
 // Validate password
 if (strlen($password) < 8) {
+    ob_end_clean();
     sendJSONResponse(['success' => false, 'message' => 'Password must be at least 8 characters'], 400);
 }
 
 // Validate program is BITA
 if (stripos($program, 'BITA') === false && stripos($program, 'BIT') === false) {
+    ob_end_clean();
     sendJSONResponse(['success' => false, 'message' => 'Only BITA students can register'], 403);
 }
 
@@ -75,12 +95,14 @@ function extractBatchFromMatric($matric) {
 // Validate matric format and extract batch
 $matricUpper = strtoupper($matric);
 if (!preg_match('/^B03\d{6,}$/', $matricUpper)) {
+    ob_end_clean();
     sendJSONResponse(['success' => false, 'message' => 'Invalid matric number format. Must start with B03 followed by digits (e.g., B032510017)'], 400);
 }
 
 // Extract batch from matric number
 $batch = extractBatchFromMatric($matricUpper);
 if (!$batch) {
+    ob_end_clean();
     sendJSONResponse(['success' => false, 'message' => 'Could not extract batch from matric number. Please check your matric number format.'], 400);
 }
 
@@ -98,6 +120,7 @@ $result = $stmt->get_result();
 if ($result->num_rows > 0) {
     $stmt->close();
     $conn->close();
+    ob_end_clean();
     sendJSONResponse(['success' => false, 'message' => 'Email already registered'], 409);
 }
 $stmt->close();
@@ -110,6 +133,7 @@ $result = $stmt->get_result();
 if ($result->num_rows > 0) {
     $stmt->close();
     $conn->close();
+    ob_end_clean();
     sendJSONResponse(['success' => false, 'message' => 'Matric number already registered'], 409);
 }
 $stmt->close();
@@ -127,6 +151,7 @@ $uploadResult = uploadImageToCloudinary($file['tmp_name'], 'matric_cards', [
 ]);
 
 if (!$uploadResult['success']) {
+    ob_end_clean();
     sendJSONResponse(['success' => false, 'message' => 'Failed to upload file to Cloudinary: ' . ($uploadResult['error'] ?? 'Unknown error')], 500);
 }
 
@@ -150,6 +175,9 @@ if ($stmt->execute()) {
     // Batch is auto-extracted from matric, but admin must verify the account
     // Session will be set after admin approves and user logs in
     
+    // Clean output buffer before sending response
+    ob_end_clean();
+    
     sendJSONResponse([
         'success' => true, 
         'message' => 'Registration submitted successfully. Your account is pending admin approval before you can login.',
@@ -163,15 +191,19 @@ if ($stmt->execute()) {
         ]
     ], 201);
 } else {
-    // Delete uploaded file if database insert fails
-    if (file_exists($filePath)) {
-        unlink($filePath);
+    // Delete from Cloudinary if database insert fails
+    if (isset($uploadResult['public_id'])) {
+        require_once __DIR__ . '/cloudinary_helper.php';
+        deleteFromCloudinary($uploadResult['public_id'], 'image');
     }
     
     $error = $stmt->error;
     $stmt->close();
     $conn->close();
+    
+    // Clean output buffer before sending response
+    ob_end_clean();
+    
     sendJSONResponse(['success' => false, 'message' => 'Registration failed: ' . $error], 500);
 }
-?>
 

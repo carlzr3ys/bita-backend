@@ -26,6 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $data = json_decode(file_get_contents('php://input'), true);
 
 if (!isset($data['email']) || !isset($data['password'])) {
+    ob_end_clean();
     sendJSONResponse(['success' => false, 'message' => 'Email and password required'], 400);
 }
 
@@ -43,6 +44,7 @@ $result = $stmt->get_result();
 if ($result->num_rows === 0) {
     $stmt->close();
     $conn->close();
+    ob_end_clean();
     sendJSONResponse(['success' => false, 'message' => 'Invalid email or password'], 401);
 }
 
@@ -52,6 +54,7 @@ $stmt->close();
 // Verify password
 if (!verifyPassword($password, $admin['password'])) {
     $conn->close();
+    ob_end_clean();
     sendJSONResponse(['success' => false, 'message' => 'Invalid email or password'], 401);
 }
 
