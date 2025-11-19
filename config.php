@@ -50,6 +50,10 @@ function getMySQLConnection() {
 
 // Helper function to send JSON response
 function sendJSONResponse($data, $statusCode = 200) {
+    // Clean any output buffer before sending headers
+    if (ob_get_level() > 0) {
+        ob_end_clean();
+    }
     http_response_code($statusCode);
     header('Content-Type: application/json');
     echo json_encode($data);
@@ -87,5 +91,4 @@ if (session_status() === PHP_SESSION_NONE) {
     
     session_start();
 }
-?>
 
