@@ -1,13 +1,13 @@
 <?php
 // Database Configuration for BITA Website
 // Simple MySQL Backend - No Firebase required!
-// Supports both local (XAMPP) and production (environment variables)
+// Supports both local (XAMPP) and production (cPanel via environment variables)
 
-// MySQL Configuration
-define('DB_HOST', getenv('DB_HOST') ?: 'localhost');
-define('DB_USER', getenv('DB_USER') ?: 'root');
-define('DB_PASS', getenv('DB_PASS') ?: ''); // Default XAMPP password is empty
-define('DB_NAME', getenv('DB_NAME') ?: 'bita_db');
+// MySQL Configuration (cPanel)
+define('DB_HOST', getenv('DB_HOST') ?: '103.191.76.66');
+define('DB_USER', getenv('DB_USER') ?: 'aireeonl_bita');
+define('DB_PASS', getenv('DB_PASS') ?: 'BITAadmin');
+define('DB_NAME', getenv('DB_NAME') ?: 'aireeonl_bita_db');
 
 // SMTP Configuration for PHPMailer/Python Email (Optional)
 // Leave empty to use PHP mail() function instead
@@ -18,10 +18,10 @@ define('SMTP_PORT', getenv('SMTP_PORT') ?: 587); // Port untuk TLS
 define('SMTP_USER', getenv('SMTP_USER') ?: 'bitaadm2425@gmail.com'); // Gmail address
 define('SMTP_PASS', getenv('SMTP_PASS') ?: 'zvus dklg hxvh pkdz'); // Gmail App Password
 
-// Cloudinary Configuration for File Storage
-define('CLOUDINARY_CLOUD_NAME', getenv('CLOUDINARY_CLOUD_NAME') ?: 'dexn4m4pr');
-define('CLOUDINARY_API_KEY', getenv('CLOUDINARY_API_KEY') ?: '914463141945499');
-define('CLOUDINARY_API_SECRET', getenv('CLOUDINARY_API_SECRET') ?: 'RNW6470vuwIuzk2icz-DxWOfUZA');
+// Local File Storage Configuration (cPanel)
+// Direktori di mana fail akan disimpan di server cPanel anda
+// Pastikan direktori ini wujud dan mempunyai kebenaran (permissions) 755 atau 777
+define('UPLOAD_DIR', getenv('UPLOAD_DIR') ?: __DIR__ . '/uploads/');
 
 /**
  * Get Database Connection
