@@ -1,27 +1,52 @@
 <?php
 // Database Configuration for BITA Website
 // Simple MySQL Backend - No Firebase required!
-// Supports both local (XAMPP) and production (cPanel via environment variables)
+// Supports both local (XAMPP with .env file) and production (Render via environment variables)
 
-// MySQL Configuration (cPanel)
-define('DB_HOST', getenv('DB_HOST') ?: '103.191.76.66');
-define('DB_USER', getenv('DB_USER') ?: 'aireeonl_bita');
-define('DB_PASS', getenv('DB_PASS') ?: 'BITAadmin');
-define('DB_NAME', getenv('DB_NAME') ?: 'aireeonl_bita_db');
+// Load .env file for local development (optional)
+// In production (Render), environment variables are set directly, so .env is not needed
+require_once __DIR__ . '/load_env.php';
+
+// MySQL Configuration
+// For production (Render): Set via environment variables in Render Dashboard (REQUIRED!)
+// For local (XAMPP): Use .env file or fallback values below
+// ⚠️ WARNING: Never commit real production credentials to Git!
+define('DB_HOST', getenv('DB_HOST') ?: 'localhost'); // From .env or Render env vars, fallback: localhost
+define('DB_USER', getenv('DB_USER') ?: 'root'); // From .env or Render env vars, fallback: root
+define('DB_PASS', getenv('DB_PASS') ?: ''); // From .env or Render env vars, fallback: empty (XAMPP)
+define('DB_NAME', getenv('DB_NAME') ?: 'bita_db'); // From .env or Render env vars, fallback: bita_db
 
 // SMTP Configuration for PHPMailer/Python Email (Optional)
 // Leave empty to use PHP mail() function instead
 // For Gmail: Use App Password (not regular password)
 // Get App Password: https://myaccount.google.com/apppasswords
-define('SMTP_HOST', getenv('SMTP_HOST') ?: 'smtp.gmail.com'); // Gmail SMTP
-define('SMTP_PORT', getenv('SMTP_PORT') ?: 587); // Port untuk TLS
-define('SMTP_USER', getenv('SMTP_USER') ?: 'bitaadm2425@gmail.com'); // Gmail address
-define('SMTP_PASS', getenv('SMTP_PASS') ?: 'zvus dklg hxvh pkdz'); // Gmail App Password
+// SMTP Configuration for PHPMailer
+// For production: Set via environment variables (REQUIRED!)
+// For local: Use fallback values or leave empty to use PHP mail()
+// ⚠️ WARNING: Never commit real SMTP credentials to Git!
+define('SMTP_HOST', getenv('SMTP_HOST') ?: 'smtp.gmail.com'); // Set in Render env vars for production
+define('SMTP_PORT', getenv('SMTP_PORT') ?: 587); // Set in Render env vars for production
+define('SMTP_USER', getenv('SMTP_USER') ?: ''); // Set in Render env vars for production
+define('SMTP_PASS', getenv('SMTP_PASS') ?: ''); // Set in Render env vars for production
 
 // Local File Storage Configuration (cPanel)
 // Direktori di mana fail akan disimpan di server cPanel anda
 // Pastikan direktori ini wujud dan mempunyai kebenaran (permissions) 755 atau 777
 define('UPLOAD_DIR', getenv('UPLOAD_DIR') ?: __DIR__ . '/uploads/');
+
+// FTP Storage Configuration (Optional - for Render backend + cPanel storage)
+// Set USE_FTP_STORAGE = true jika backend di Render tapi storage di cPanel
+// Set USE_FTP_STORAGE = false jika backend dan storage sama (cPanel)
+define('USE_FTP_STORAGE', getenv('USE_FTP_STORAGE') ?: false);
+
+// FTP/SFTP Configuration (only needed if USE_FTP_STORAGE = true)
+define('FTP_HOST', getenv('FTP_HOST') ?: ''); // cPanel FTP host (e.g., 'ftp.yourdomain.com' or IP)
+define('FTP_USER', getenv('FTP_USER') ?: ''); // cPanel FTP username
+define('FTP_PASS', getenv('FTP_PASS') ?: ''); // cPanel FTP password
+define('FTP_PORT', getenv('FTP_PORT') ?: 21); // FTP port (21 for FTP, 22 for SFTP)
+define('FTP_USE_SSL', getenv('FTP_USE_SSL') ?: false); // Use FTPS (FTP over SSL)
+define('FTP_BASE_DIR', getenv('FTP_BASE_DIR') ?: '/public_html/'); // Base directory on cPanel (usually /public_html/)
+define('CPANEL_DOMAIN', getenv('CPANEL_DOMAIN') ?: ''); // Your domain for generating file URLs (e.g., 'yourdomain.com')
 
 /**
  * Get Database Connection
