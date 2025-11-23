@@ -1,64 +1,48 @@
 <?php
-/**
- * Test Backend Connection
- * Simple endpoint untuk test backend dan database connection
- */
+// Simple backend health check endpoint
+ob_start();
 
 require_once '../config.php';
 
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
-header('Access-Control-Allow-Methods: GET, POST');
+header('Access-Control-Allow-Origin: https://bitaportal.netlify.app');
+header('Access-Control-Allow-Methods: GET, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Credentials: true');
+header('Access-Control-Max-Age: 86400');
+
+// Handle CORS preflight
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    ob_end_clean();
+    exit();
+}
+
+// Test database connection
+$dbStatus = 'unknown';
+$dbError = null;
 
 try {
-    // Test database connection
     $conn = getDBConnection();
-    
-    if (!$conn) {
-        sendJSONResponse([
-            'success' => false,
-            'message' => 'Database connection failed',
-            'backend' => 'working',
-            'database' => 'failed'
-        ], 500);
-    }
-    
-    // Get MySQL version before closing connection
-    $mysqlVersion = $conn->server_info ?? 'unknown';
-    
-    // Test database query
-    $result = $conn->query("SELECT 1 as test");
-    
-    if ($result) {
-        sendJSONResponse([
-            'success' => true,
-            'message' => 'Backend is working correctly!',
-            'backend' => 'working',
-            'database' => 'connected',
-            'mysql_version' => $mysqlVersion,
-            'timestamp' => date('Y-m-d H:i:s')
-        ]);
-        
-        $conn->close();
+    if ($conn && $conn->ping()) {
+        $dbStatus = 'connected';
     } else {
-        $error = $conn->error;
-        $conn->close();
-        
-        sendJSONResponse([
-            'success' => false,
-            'message' => 'Database query failed: ' . $error,
-            'backend' => 'working',
-            'database' => 'query_failed'
-        ], 500);
+        $dbStatus = 'disconnected';
+        $dbError = 'Connection ping failed';
     }
-    
 } catch (Exception $e) {
-    sendJSONResponse([
-        'success' => false,
-        'message' => 'Backend error: ' . $e->getMessage(),
-        'backend' => 'error',
-        'error_type' => get_class($e)
-    ], 500);
+    $dbStatus = 'error';
+    $dbError = $e->getMessage();
 }
-?>
 
+ob_end_clean();
+
+sendJSONResponse([
+    'success' => true,
+    'message' => 'Backend is running!',
+    'backend_status' => 'online',
+    'database_status' => $dbStatus,
+    'database_error' => $dbError,
+    'timestamp' => date('Y-m-d H:i:s'),
+    'server_time' => time()
+]);

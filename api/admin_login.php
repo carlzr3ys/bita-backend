@@ -5,9 +5,10 @@ ob_start();
 require_once '../config.php';
 
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *');
+// CORS headers for production (Netlify frontend)
+header('Access-Control-Allow-Origin: https://bitaportal.netlify.app');
 header('Access-Control-Allow-Methods: POST, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 header('Access-Control-Allow-Credentials: true');
 header('Access-Control-Max-Age: 86400'); // 24 hours
 
@@ -20,10 +21,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     ob_end_clean();
+    error_log("Admin Login API: Invalid request method - " . $_SERVER['REQUEST_METHOD']);
     sendJSONResponse(['success' => false, 'message' => 'Invalid request method'], 405);
 }
 
-$data = json_decode(file_get_contents('php://input'), true);
+$input = file_get_contents('php://input');
+error_log("Admin Login API: Received POST request - Input length: " . strlen($input));
+
+$data = json_decode($input, true);
+
+if (json_last_error() !== JSON_ERROR_NONE) {
+    ob_end_clean();
+    error_log("Admin Login API: JSON decode error - " . json_last_error_msg());
+    sendJSONResponse(['success' => false, 'message' => 'Invalid JSON data: ' . json_last_error_msg()], 400);
+}
 
 if (!isset($data['email']) || !isset($data['password'])) {
     ob_end_clean();
